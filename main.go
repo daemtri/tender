@@ -4,45 +4,15 @@ import (
 	"fmt"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/require"
-	babel "github.com/jvatic/goja-babel"
-	"io/ioutil"
+	"github.com/duanqy/tender/pkg/babel"
 	"log"
-	"strings"
 )
 
 func main()  {
-	registry := require.NewRegistryWithLoader(func(path string) (bytes []byte, err error) {
-		if !strings.HasSuffix(path, ".js") {
-			path = path + ".js"
-		}
-		src,err := ioutil.ReadFile(path)
-		if err != nil {
-			return nil,err
-		}
-		resp,err := babel.TransformString(string(src), map[string]interface{}{
-			"presets": []string{
-				"es2015",
-			},
-		})
-		if err != nil {
-			return nil,err
-		}
-		return []byte(resp),nil
-
-	}) // this can be shared by multiple runtimes
-
-	src,err := ioutil.ReadFile("tender.js")
+	registry := require.NewRegistryWithLoader(babel.ReadFile) // this can be shared by multiple runtimes
+	src,err := babel.ReadFile("tender.js")
 	if err != nil {
-		panic(err)
-	}
-
-	resp,err := babel.TransformString(string(src), map[string]interface{}{
-		"presets": []string{
-			"es2015",
-		},
-	})
-	if err != nil {
-		panic(err)
+		log.Fatalln(err)
 	}
 
 	vm := goja.New()
@@ -53,11 +23,18 @@ func main()  {
 			fmt.Println("x",x)
 			var cfg = make(map[string]interface{})
 			fn(cfg)
+
 			fmt.Println(cfg)
 		},
+		"name" :"test",
 	})
-	ioutil.WriteFile("tender.es5.js", []byte(resp), 0755)
-	v,err := vm.RunString(resp)
+	vm.Set("console", map[string]interface{}{
+		"log" : func(data ...interface{}) {
+			fmt.Println(data...)
+		},
+	})
+
+	v,err := vm.RunString(string(src))
 	if err != nil {
 		log.Fatalln(err)
 	}
